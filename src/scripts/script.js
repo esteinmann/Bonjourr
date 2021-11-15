@@ -445,13 +445,13 @@ function quickLinks(event, that, initStorage) {
 		// Mouse clicks
 		elem.oncontextmenu = function (e) {
 			e.preventDefault()
-			editlink(this)
+			editlink(this, e)
 		}
 
 		elem.onmouseup = function (e) {
 			removeLinkSelection()
 			clearTimeout(editDisplayTimeout)
-			e.which === 3 ? editlink(this) : !has(id('settings'), 'shown') ? openlink(this, e) : ''
+			e.which === 3 ? editlink(this, e) : !has(id('settings'), 'shown') ? openlink(this, e) : ''
 		}
 
 		// Mobile clicks
@@ -502,7 +502,7 @@ function quickLinks(event, that, initStorage) {
 
 		id('e_submit').onclick = function () {
 			removeLinkSelection()
-			const noError = editlink(null, parseInt(id('edit_link').getAttribute('index')))
+			const noError = editlink(null, null, parseInt(id('edit_link').getAttribute('index')))
 			if (noError) closeEditLink()
 		}
 		// close on button
@@ -521,7 +521,7 @@ function quickLinks(event, that, initStorage) {
 		id('e_iconurl').onkeyup = (e) => showDelIcon(e.target)
 	}
 
-	function editlink(that, i) {
+	function editlink(that, e, i) {
 		//
 		const e_title = id('e_title')
 		const e_url = id('e_url')
@@ -598,11 +598,13 @@ function quickLinks(event, that, initStorage) {
 			const index = findindex(that)
 			const liconwrap = that.querySelector('.l_icon_wrap')
 			const container = id('edit_linkContainer')
-			const openSettings = has(id('settings'), 'shown')
 
 			clas(liconwrap, true, 'selected')
 			clas(container, true, 'shown')
-			clas(container, openSettings, 'pushed')
+
+			const box = container.getBoundingClientRect()
+			const containerPos = [e.pageX - (box.width + 40), e.pageY - (box.height + 40)]
+			container.setAttribute('style', `top: ${containerPos[1]}px; left: ${containerPos[0]}px`)
 
 			id('edit_link').setAttribute('index', index)
 
@@ -761,7 +763,7 @@ function quickLinks(event, that, initStorage) {
 		// No need to activate edit events asap
 		setTimeout(function timeToSetEditEvents() {
 			id('edit_linkContainer').oncontextmenu = (e) => e.preventDefault()
-			editEvents()
+			editEvents(that)
 		}, 150)
 	}
 }
