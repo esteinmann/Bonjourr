@@ -508,6 +508,22 @@ function quickLinks(event, that, initStorage) {
 		// close on button
 		id('e_close').onclick = () => closeEditLink()
 
+		id('dragbar').onmousedown = (e) => {
+			const bounds = id('edit_link').getBoundingClientRect()
+			const offsetY = e.pageY - bounds.y
+			const offsetX = e.pageX - bounds.x
+			let letgo = false
+
+			this.onmouseup = () => (letgo = true)
+			this.onmousemove = (e) => {
+				if (!letgo)
+					id('edit_link').setAttribute(
+						'style',
+						`transform: translate(${e.pageX - offsetX}px, ${e.pageY - offsetY}px)`
+					)
+			}
+		}
+
 		// close on outside click
 		const outsideClick = (e) => (e.target.id === 'edit_linkContainer' ? closeEditLink() : '')
 		if (mobilecheck) editLinkContainer.addEventListener('touchstart', outsideClick, { passive: true })
@@ -602,10 +618,7 @@ function quickLinks(event, that, initStorage) {
 			clas(liconwrap, true, 'selected')
 			clas(container, true, 'shown')
 
-			const box = container.getBoundingClientRect()
-			const containerPos = [e.pageX - (box.width + 40), e.pageY - (box.height + 40)]
-			container.setAttribute('style', `top: ${containerPos[1]}px; left: ${containerPos[0]}px`)
-
+			id('edit_link').setAttribute('style', `transform: translate(${e.pageX - 350}px, ${e.pageY - 280}px)`)
 			id('edit_link').setAttribute('index', index)
 
 			chrome.storage.sync.get('links', (data) => {
