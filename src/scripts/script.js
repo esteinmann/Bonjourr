@@ -228,30 +228,6 @@ function clock(event, init) {
 	}
 }
 
-function replacesIconAliases(links, callback) {
-	//
-	// Find all aliased icons
-	let iconList = Object.values(links).map((link) => link.icon)
-	const aliasList = iconList.filter((url) => url.startsWith('alias:'))
-
-	if (aliasList.length > 0) {
-		chrome.storage.local.get(aliasList, (data) => {
-			//
-			// For all icons
-			iconList.forEach((url, i) => {
-				if (url.startsWith('alias:')) {
-					// Empty icons that matches aliases, replaces empty icon by alias data
-					iconList[i] = Object.entries(data)
-						.map(([key, val]) => (key === url ? val : ''))
-						.filter((elem) => elem !== '')[0]
-				}
-			})
-
-			callback(iconList)
-		})
-	} else callback(iconList)
-}
-
 function quickLinks(event, that, initStorage) {
 	// Pour ne faire qu'un seul storage call
 	// [{ index: number, url: string }]
@@ -387,7 +363,7 @@ function quickLinks(event, that, initStorage) {
 
 	function addEvents(elem) {
 		function handleDrag(is, that) {
-			chrome.storage.sync.get('links', (data) => {
+			chrome.storage.sync.get(linksKeys, (data) => {
 				const i = findindex(that)
 
 				switch (is) {
@@ -527,21 +503,21 @@ function quickLinks(event, that, initStorage) {
 		const e_url = id('e_url')
 		const e_iconurl = id('e_iconurl')
 
-		if (e_iconurl.value.length === 8080) {
+		if (e_iconurl.value.length === 7000) {
 			e_iconurl.value = ''
-			e_iconurl.setAttribute('placeholder', tradThis('Icon must be < 8kB'))
+			e_iconurl.setAttribute('placeholder', tradThis('Icon must be < 7kB'))
 
 			return false
 		}
 
 		const updated = {
-			title: stringMaxSize(e_title.value, 32),
-			url: stringMaxSize(e_url.value, 128),
-			icon: stringMaxSize(e_iconurl.value, 8080),
+			title: stringMaxSize(e_title.value, 64),
+			url: stringMaxSize(e_url.value, 1024),
+			icon: stringMaxSize(e_iconurl.value, 7000),
 		}
 
 		if (i || i === 0) {
-			chrome.storage.sync.get('links', (data) => {
+			chrome.storage.sync.get(linksKeys, (data) => {
 				let allLinks = [...data.links]
 				const parent = domlinkblocks.children[i + 1]
 
@@ -567,13 +543,7 @@ function quickLinks(event, that, initStorage) {
 							case 'icon': {
 								parent.querySelector('img').src = updated.icon
 
-								// Saves to an alias if icon too big
-								if (updated.icon.length > 64) {
-									const alias = saveIconAsAlias(updated.icon)
-									updated.icon = alias
-								}
-
-								// Removes old icon from storage if alias
+								// Remove old alias from <1.11.2
 								if (allLinks[i].icon.startsWith('alias:')) {
 									chrome.storage.local.remove(allLinks[i].icon)
 								}
@@ -606,7 +576,7 @@ function quickLinks(event, that, initStorage) {
 
 			id('editlink').setAttribute('index', index)
 
-			chrome.storage.sync.get('links', (data) => {
+			chrome.storage.sync.get(linksKeys, (data) => {
 				const { title, url, icon } = data.links[index]
 
 				e_title.setAttribute('placeholder', tradThis('Title'))
@@ -653,7 +623,7 @@ function quickLinks(event, that, initStorage) {
 	}
 
 	function removeblock(index) {
-		chrome.storage.sync.get('links', (data) => {
+		chrome.storage.sync.get(linksKeys, (data) => {
 			// Remove alias from storage
 			if (data.links[index].icon.startsWith('alias:')) {
 				chrome.storage.local.remove(data.links[index].icon)
@@ -686,7 +656,7 @@ function quickLinks(event, that, initStorage) {
 			id('i_title').value = ''
 			id('i_url').value = ''
 
-			chrome.storage.sync.get('links', (data) => {
+			chrome.storage.sync.get(linksKeys, (data) => {
 				const blocklist = id('linkblocks_inner').querySelectorAll('.block_parent')
 
 				if (data.links) {
@@ -759,7 +729,7 @@ function quickLinks(event, that, initStorage) {
 	}
 
 	if (initStorage) {
-		initblocks(initStorage.links || [])
+		initblocks(flatLinks(initStorage) || [])
 
 		// No need to activate edit events asap
 		setTimeout(function timeToSetEditEvents() {
@@ -850,7 +820,7 @@ async function linksImport() {
 	// Ask for bookmarks first
 	chrome.permissions.request({ permissions: ['bookmarks'] }, (granted) => {
 		if (granted) {
-			chrome.storage.sync.get('links', (data) => {
+			chrome.storage.sync.get(linksKeys, (data) => {
 				;(window.location.protocol === 'moz-extension:' ? browser : chrome).bookmarks.getTree().then((response) => {
 					clas(id('bookmarks_container'), true, 'shown')
 					main(data, response)
@@ -2537,20 +2507,10 @@ function sunTime(init) {
 	}
 }
 
-function filterImports(data) {
+function filterImports(data, local) {
 	const filter = {
 		lang: (lang) => (lang === undefined ? 'en' : lang),
 		background_blur: (blur) => (typeof blur === 'string' ? parseFloat(blur) : blur),
-
-		links: (links) => {
-			if (links && links.length > 0)
-				links.forEach((elem, index) => {
-					if (elem.icon.length > 8080) links[index].icon = 'src/assets/interface/loading.gif'
-					else if (elem.icon.length > 64) links[index].icon = saveIconAsAlias(elem.icon)
-				})
-
-			return links
-		},
 
 		dynamic: (dynamic) => {
 			if (dynamic) {
@@ -2643,6 +2603,11 @@ function filterImports(data) {
 
 	// Go through found categories in import data to filter them
 	Object.entries(result).forEach(([key, val]) => (filter[key] ? (result[key] = filter[key](val)) : ''))
+
+	// 1.11.2 flatten links
+	const iconList = replacesIconAliases(result.links, local)
+	result.links.forEach((link, i) => (result['link_' + i] = { title: link.title, url: link.url, icon: iconList[i] }))
+	delete result.links
 
 	return result
 }
@@ -2747,22 +2712,27 @@ window.onload = function () {
 
 				case 'newVersion': {
 					//
-					// 1.9.3 => 1.10, fills default data to storage
+					// 1.9.x => 1.10, fills default data to storage
 					if (!data.about)
 						Object.entries(bonjourrDefaults('sync')).forEach(([key, val]) =>
 							data[key] === undefined ? (data[key] = val) : data[key]
 						)
 
-					data = filterImports(data)
-					data.about.version = BonjourrVersion
-					chrome.storage.sync.set(isExtension ? data : { import: data })
-					startup(data)
+					// Needs local for icon aliases
+					chrome.storage.local.get(null, (local) => {
+						data = filterImports(data, local)
+						data.about.version = BonjourrVersion
+						chrome.storage.sync.set(isExtension ? data : { import: data })
+						startup(data)
+					})
+
 					break
 				}
 
-				case 'normal':
+				case 'normal': {
 					startup(data)
 					break
+				}
 			}
 		})
 	} catch (error) {

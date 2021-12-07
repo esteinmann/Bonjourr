@@ -41,7 +41,7 @@ if (navigator.userAgentData) mobilecheck = navigator.userAgentData.mobile
 const isExtension = window.location.protocol === 'chrome-extension:' || window.location.protocol === 'moz-extension:',
 	loadtimeStart = performance.now(),
 	BonjourrAnimTime = 400,
-	BonjourrVersion = '1.11.1',
+	BonjourrVersion = '1.11.2',
 	funcsOk = {
 		clock: false,
 		links: false,
@@ -71,13 +71,46 @@ switch (window.location.protocol) {
 const stringMaxSize = (string, size) => (string.length > size ? string.slice(0, size) : string)
 const minutator = (date) => date.getHours() * 60 + date.getMinutes()
 
-const saveIconAsAlias = (iconstr) => {
-	const alias = 'alias:' + Math.random().toString(26).substring(2)
-	const tosave = {}
-	tosave[alias] = iconstr
-	chrome.storage.local.set(tosave)
-	return alias
+//
+// Links update
+//
+
+const linksKeys = () => new Array(30).fill(0).map((a, i) => 'link_' + i)
+
+const splitLinks = (data) => {
+	data.links.forEach((link, i) => (data['link_' + i] = link))
+	delete data.links
+	return data
 }
+
+const flatLinks = (data) =>
+	Object.keys(data)
+		.filter((key) => key.startsWith('link_'))
+		.map((key) => data[key])
+
+function replacesIconAliases(links, local) {
+	//
+	// Find all aliased icons
+	let iconList = Object.values(links).map((link) => link.icon)
+	const aliasList = iconList.filter((url) => url.startsWith('alias:'))
+
+	if (aliasList.length > 0) {
+		iconList.forEach((url, i) => {
+			if (url.startsWith('alias:')) {
+				// Empty icons that matches aliases, replaces empty icon by alias data
+				iconList[i] = Object.entries(local)
+					.map(([key, val]) => (key === url ? val : ''))
+					.filter((elem) => elem !== '')[0]
+			}
+		})
+	}
+
+	return iconList
+}
+
+//
+// Test
+//
 
 function validateHideElem(hide) {
 	let res = true
@@ -94,6 +127,10 @@ function validateHideElem(hide) {
 
 	return res
 }
+
+//
+// Events
+//
 
 function slowRange(tosave, time = 400) {
 	clearTimeout(rangeActive)
