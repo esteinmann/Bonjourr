@@ -3206,7 +3206,7 @@ export const dict = {
 	Shadow: {
 		fr: 'Ombres',
 		sv: 'Shadow',
-		nl: 'Shadow',
+		nl: 'Schaduw',
 		pl: 'Cień',
 		pt_BR: 'Sombra',
 		ru: 'Тень',
